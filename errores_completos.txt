@@ -1,0 +1,15 @@
+=== ERRORES DE COMPILACIÓN K.A.Y. ASSISTANT === 
+Generado: 08-Jun-25 22:54:22.41 
+ 
+=== INSTRUCCIONES === 
+1. Ve a Android Studio 
+2. Pestaña "Problems" (parte inferior) 
+3. Selecciona TODOS los errores (Ctrl + A) 
+4. Copia (Ctrl + C) 
+5. Pega aquí abajo en este archivo 
+ 
+=== PEGA AQUÍ LOS ERRORES === 
+ 
+ 
+ 
+ 

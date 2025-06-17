@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/primary_dark">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Configuración"
+            android:textColor="@color/white"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="24dp"/>
+
+        <!-- Sección de Permisos -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Permisos"
+            android:textColor="@color/white"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="16dp"/>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:cardBackgroundColor="#1AFFFFFF"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="4dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:id="@+id/btn_microphone"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Microphone"
+                    android:textColor="@color/white"
+                    android:drawableEnd="@drawable/ic_arrow_right"
+                    android:padding="12dp"
+                    android:background="?attr/selectableItemBackground"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#33FFFFFF"/>
+
+                <TextView
+                    android:id="@+id/btn_storage"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Storage"
+                    android:textColor="@color/white"
+                    android:drawableEnd="@drawable/ic_arrow_right"
+                    android:padding="12dp"
+                    android:background="?attr/selectableItemBackground"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#33FFFFFF"/>
+
+                <TextView
+                    android:id="@+id/btn_system"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="System Control"
+                    android:textColor="@color/white"
+                    android:drawableEnd="@drawable/ic_arrow_right"
+                    android:padding="12dp"
+                    android:background="?attr/selectableItemBackground"/>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Sección de Preferencias -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Preferencias"
+            android:textColor="@color/white"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="16dp"/>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:cardBackgroundColor="#1AFFFFFF"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="4dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:id="@+id/btn_voice"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Voice Recognition"
+                    android:textColor="@color/white"
+                    android:drawableEnd="@drawable/ic_arrow_right"
+                    android:padding="12dp"
+                    android:background="?attr/selectableItemBackground"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#33FFFFFF"/>
+
+                <TextView
+                    android:id="@+id/btn_notifications"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Notifications"
+                    android:textColor="@color/white"
+                    android:drawableEnd="@drawable/ic_arrow_right"
+                    android:padding="12dp"
+                    android:background="?attr/selectableItemBackground"/>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+    </LinearLayout>
+</ScrollView> 

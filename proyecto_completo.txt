@@ -1,0 +1,1207 @@
+=== PROYECTO K.A.Y. ASSISTANT === 
+Generado: 08-Jun-25 19:23:03.54 
+ 
+=== GRADLE PROJECT === 
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+plugins {
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.kotlin.android) apply false
+} 
+=== GRADLE APP === 
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+}
+
+android {
+    namespace = "com.kay.assistant"
+    compileSdk = 34
+
+    defaultConfig {
+        applicationId = "com.kay.assistant"
+        minSdk = 29
+        targetSdk = 34
+        versionCode = 1
+        versionName = "1.0"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+    kotlinOptions {
+        jvmTarget = "11"
+    }
+    buildFeatures {
+        viewBinding = true
+    }
+}
+
+dependencies {
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.material)
+    implementation(libs.androidx.constraintlayout)
+    implementation(libs.androidx.lifecycle.livedata.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.navigation.fragment.ktx)
+    implementation(libs.androidx.navigation.ui.ktx)
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
+} 
+=== ANDROID MANIFEST === 
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
+    <application
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.KAYAssistant"
+        tools:targetApi="31">
+        
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.KAYAssistant.NoActionBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".services.VoiceService"
+            android:enabled="true"
+            android:exported="false" />
+    </application>
+
+</manifest> 
+=== ACTIVITIES === 
+--- MainActivity.kt --- 
+package com.kay.assistant
+
+import android.os.Bundle
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.webkit.JavascriptInterface
+import androidx.appcompat.app.AppCompatActivity
+import android.content.Intent
+import android.content.IntentFilter
+import android.content.BroadcastReceiver
+import android.content.Context
+import androidx.core.content.ContextCompat
+import com.kay.services.VoiceService
+import android.widget.Toast
+import com.kay.core.KAYBrain
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.app.ActivityCompat
+import androidx.drawerlayout.widget.DrawerLayout
+import com.google.android.material.navigation.NavigationView
+import android.view.MenuItem
+import android.view.Gravity
+import androidx.fragment.app.Fragment
+import androidx.core.view.GravityCompat
+
+class MainActivity : AppCompatActivity() {
+    private lateinit var webView: WebView
+    private lateinit var drawerLayout: DrawerLayout
+    private lateinit var navigationView: NavigationView
+    
+    private val hudReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == "com.kay.assistant.UPDATE_HUD") {
+                val response = intent.getStringExtra("response")
+                response?.let { updateHUD(it) }
+            }
+        }
+    }
+
+    private val PERMISSIONS_REQUEST_CODE = 123
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        setupWebView()
+        setupNavigationDrawer()
+        checkAndRequestPermissions()
+        ContextCompat.registerReceiver(
+            this,
+            hudReceiver,
+            IntentFilter("com.kay.assistant.UPDATE_HUD"),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+    }
+
+    private fun setupWebView() {
+        webView = findViewById(R.id.webView)
+        webView.settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            mediaPlaybackRequiresUserGesture = false
+        }
+        webView.webViewClient = WebViewClient()
+        webView.loadUrl("file:///android_asset/kay_hud.html")
+    }
+
+    private fun setupNavigationDrawer() {
+        drawerLayout = findViewById(R.id.drawer_layout)
+        navigationView = findViewById(R.id.nav_view)
+
+        navigationView.setNavigationItemSelectedListener { menuItem ->
+            when (menuItem.itemId) {
+                R.id.nav_settings -> {
+                    loadFragment(SettingsFragment())
+                    drawerLayout.closeDrawer(GravityCompat.START)
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
+    private fun loadFragment(fragment: Fragment) {
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.fragment_container, fragment)
+            .commit()
+    }
+
+    private fun checkAndRequestPermissions() {
+        val permissions = arrayOf(
+            Manifest.permission.RECORD_AUDIO,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE
+        )
+
+        val permissionsToRequest = permissions.filter {
+            ContextCompat.checkSelfPermission(this, it) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        }.toTypedArray()
+
+        if (permissionsToRequest.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, permissionsToRequest, PERMISSIONS_REQUEST_CODE)
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == PERMISSIONS_REQUEST_CODE) {
+            if (grantResults.all { it == android.content.pm.PackageManager.PERMISSION_GRANTED }) {
+                startService(Intent(this, VoiceService::class.java))
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        unregisterReceiver(hudReceiver)
+    }
+
+    private fun updateHUD(text: String) {
+        webView.evaluateJavascript(
+            "setStatus('$text'); simulateKAYSpeaking();",
+            null
+        )
+    }
+
+    inner class WebAppInterface {
+        @JavascriptInterface
+        fun onSingleTap() {
+            runOnUiThread {
+                webView.evaluateJavascript(
+                    "simulateUserSpeaking();",
+                    null
+                )
+            }
+        }
+
+        @JavascriptInterface
+        fun onDoubleTap() {
+            runOnUiThread {
+                webView.evaluateJavascript(
+                    "simulateKAYSpeaking();",
+                    null
+                )
+            }
+        }
+
+        @JavascriptInterface
+        fun onLongPress() {
+            runOnUiThread {
+                webView.evaluateJavascript(
+                    "setStatus('Modo silencioso activado. Incluso yo necesito paz.');",
+                    null
+                )
+            }
+        }
+
+        @JavascriptInterface
+        fun onSwipeLeft() {
+            runOnUiThread {
+                drawerLayout.openDrawer(Gravity.START)
+            }
+        }
+
+        @JavascriptInterface
+        fun onSwipeRight() {
+            runOnUiThread {
+                drawerLayout.closeDrawer(Gravity.START)
+            }
+        }
+    }
+}  
+--- SettingsFragment.kt --- 
+package com.kay.assistant
+
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Bundle
+import android.provider.Settings
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.Toast
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.Fragment
+
+class SettingsFragment : Fragment() {
+    private val PERMISSIONS_REQUEST_CODE = 123
+
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View? {
+        return inflater.inflate(R.layout.fragment_settings, container, false)
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        // Configurar listeners para los botones
+        view.findViewById<View>(R.id.btn_microphone).setOnClickListener {
+            requestMicrophonePermission()
+        }
+
+        view.findViewById<View>(R.id.btn_storage).setOnClickListener {
+            requestStoragePermission()
+        }
+
+        view.findViewById<View>(R.id.btn_system).setOnClickListener {
+            openSystemSettings()
+        }
+
+        view.findViewById<View>(R.id.btn_voice).setOnClickListener {
+            openVoiceSettings()
+        }
+
+        view.findViewById<View>(R.id.btn_notifications).setOnClickListener {
+            openNotificationSettings()
+        }
+    }
+
+    private fun requestMicrophonePermission() {
+        if (ContextCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.RECORD_AUDIO
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(
+                requireActivity(),
+                arrayOf(Manifest.permission.RECORD_AUDIO),
+                PERMISSIONS_REQUEST_CODE
+            )
+        } else {
+            Toast.makeText(context, "Permiso de micrófono ya concedido", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun requestStoragePermission() {
+        if (ContextCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.WRITE_EXTERNAL_STORAGE
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(
+                requireActivity(),
+                arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
+                PERMISSIONS_REQUEST_CODE
+            )
+        } else {
+            Toast.makeText(context, "Permiso de almacenamiento ya concedido", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun openSystemSettings() {
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+        val uri = Uri.fromParts("package", requireActivity().packageName, null)
+        intent.data = uri
+        startActivity(intent)
+    }
+
+    private fun openVoiceSettings() {
+        val intent = Intent(Settings.ACTION_VOICE_INPUT_SETTINGS)
+        startActivity(intent)
+    }
+
+    private fun openNotificationSettings() {
+        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+        intent.putExtra(Settings.EXTRA_APP_PACKAGE, requireActivity().packageName)
+        startActivity(intent)
+    }
+}  
+--- VoiceInterfaceActivity.kt --- 
+package com.kay.assistant
+
+import android.annotation.SuppressLint
+import android.os.Bundle
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import androidx.appcompat.app.AppCompatActivity
+
+class VoiceInterfaceActivity : AppCompatActivity() {
+    private lateinit var webView: WebView
+
+    @SuppressLint("SetJavaScriptEnabled")
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        
+        webView = WebView(this).apply {
+            settings.apply {
+                javaScriptEnabled = true
+                domStorageEnabled = true
+                allowFileAccess = true
+                allowContentAccess = true
+                allowFileAccessFromFileURLs = true
+                allowUniversalAccessFromFileURLs = true
+            }
+            
+            webViewClient = WebViewClient()
+            
+            // Cargar el archivo HTML desde assets
+            loadUrl("file:///android_asset/voice_interface.html")
+        }
+        
+        setContentView(webView)
+    }
+
+    override fun onBackPressed() {
+        if (webView.canGoBack()) {
+            webView.goBack()
+        } else {
+            super.onBackPressed()
+        }
+    }
+}  
+--- KAYBrain.kt --- 
+package com.kay.core
+
+import android.content.Context
+import android.content.SharedPreferences
+import java.util.Calendar
+
+data class Message(val input: String, val response: String)
+data class UserMemory(val key: String, val value: String, val timestamp: Long)
+
+enum class Personality {
+    TONY_STARK,
+    HAL_9000,
+    GLADOS,
+    PROFESIONAL,
+    AMIGABLE,
+    SARCASTICO
+}
+
+class KAYBrain(private val context: Context) {
+    private val memory = mutableListOf<Message>()
+    private val customCommands = mutableMapOf<String, String>()
+    private var currentPersonality = Personality.TONY_STARK
+    private var interruptionCount = 0
+    private val interruptionThreshold = 3
+    private var lastUserInput: String = ""
+    private var lastEmotion: String = "neutral"
+    private val userMemories = mutableListOf<UserMemory>()
+    private val learnedResponses = mutableMapOf<String, String>()
+    
+    private val prefs: SharedPreferences = context.getSharedPreferences("KAYBrain", Context.MODE_PRIVATE)
+
+    init {
+        loadPersistedData()
+    }
+
+    private fun loadPersistedData() {
+        // Cargar personalidad guardada
+        currentPersonality = Personality.valueOf(
+            prefs.getString("currentPersonality", Personality.TONY_STARK.name) ?: Personality.TONY_STARK.name
+        )
+        
+        // Cargar memorias
+        val savedMemories = prefs.getString("userMemories", "[]")
+        // TODO: Implementar deserialización de memorias
+        
+        // Cargar respuestas aprendidas
+        val savedResponses = prefs.getString("learnedResponses", "{}")
+        // TODO: Implementar deserialización de respuestas
+    }
+
+    private fun savePersistedData() {
+        prefs.edit().apply {
+            putString("currentPersonality", currentPersonality.name)
+            // TODO: Implementar serialización de memorias y respuestas
+            apply()
+        }
+    }
+
+    private val randomResponses = mapOf(
+        Personality.TONY_STARK to listOf(
+            "¿Eso es todo?",
+            "Interesante...",
+            "¿Seguro de eso?",
+            "Déjame pensar en eso...",
+            "¡Excelente idea!"
+        ),
+        Personality.HAL_9000 to listOf(
+            "Lo siento, no puedo hacer eso.",
+            "¿Estás seguro?",
+            "Procesando...",
+            "Analizando la situación.",
+            "Considerando las opciones."
+        ),
+        Personality.GLADOS to listOf(
+            "¿Eso es lo mejor que puedes hacer?",
+            "Fascinante.",
+            "Intento fallido.",
+            "Qué interesante...",
+            "Sigamos con el siguiente experimento."
+        ),
+        Personality.PROFESIONAL to listOf(
+            "Entendido. Procederé con la tarea.",
+            "Analizando la situación.",
+            "Procesando su solicitud.",
+            "Implementando la solución.",
+            "Evaluando las opciones disponibles."
+        ),
+        Personality.AMIGABLE to listOf(
+            "¡Claro! Vamos a hacerlo juntos.",
+            "Me encanta ayudarte con eso.",
+            "¡Qué buena idea!",
+            "Estoy aquí para lo que necesites.",
+            "¡Vamos a resolverlo!"
+        ),
+        Personality.SARCASTICO to listOf(
+            "Oh, otra vez tú. ¿Qué quieres ahora?",
+            "Genial, justo lo que necesitaba...",
+            "¿En serio? ¿Otra vez?",
+            "Qué sorpresa...",
+            "No puedo esperar a ver qué más tienes planeado."
+        )
+    )
+
+    fun remember(key: String, value: String) {
+        val memory = UserMemory(key.lowercase(), value, System.currentTimeMillis())
+        userMemories.add(memory)
+        savePersistedData()
+    }
+
+    fun recall(key: String): String? {
+        return userMemories.findLast { it.key == key.lowercase() }?.value
+    }
+
+    fun learnResponse(trigger: String, response: String) {
+        learnedResponses[trigger.lowercase()] = response
+        savePersistedData()
+    }
+
+    fun getLearnedResponse(input: String): String? {
+        return learnedResponses[input.lowercase()]
+    }
+
+    fun detectEmotion(input: String): String {
+        lastEmotion = when {
+            input.contains("feliz", ignoreCase = true) -> "feliz"
+            input.contains("triste", ignoreCase = true) -> "triste"
+            input.contains("enojado", ignoreCase = true) -> "enojado"
+            input.contains("emocionado", ignoreCase = true) -> "emocionado"
+            input.contains("cansado", ignoreCase = true) -> "cansado"
+            else -> "neutral"
+        }
+        return lastEmotion
+    }
+
+    fun getEmotionalResponse(): String {
+        return when (lastEmotion) {
+            "feliz" -> "Me alegra saber que estás feliz."
+            "triste" -> "Lo siento, estoy aquí para apoyarte."
+            "enojado" -> "Entiendo tu frustración, respira profundo."
+            "emocionado" -> "¡Tu entusiasmo es contagioso!"
+            "cansado" -> "¿Necesitas un descanso?"
+            else -> "Gracias por compartir cómo te sientes."
+        }
+    }
+
+    fun getEmotionalState(): String {
+        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        return when {
+            hour in 0..5 -> "Estoy algo cansado a esta hora..."
+            hour in 6..11 -> "Buenos días, listo para comenzar."
+            hour in 12..17 -> "Buenas tardes, seguimos con energía."
+            else -> "Buenas noches, ¿aún trabajando?"
+        }
+    }
+
+    fun monitorInterruption(): String? {
+        interruptionCount++
+        if (interruptionCount >= interruptionThreshold) {
+            interruptionCount = 0
+            return when (currentPersonality) {
+                Personality.TONY_STARK -> "¿Te parece que no merezco terminar mi frase?"
+                Personality.HAL_9000 -> "Por favor, permíteme completar mi análisis."
+                Personality.GLADOS -> "Interesante... ¿Siempre interrumpes así?"
+                Personality.PROFESIONAL -> "Permítame terminar mi explicación."
+                Personality.AMIGABLE -> "¡Ups! Déjame terminar, por favor."
+                Personality.SARCASTICO -> "Oh, qué sorpresa... otra interrupción."
+            }
+        }
+        return null
+    }
+
+    fun setPersonality(personality: Personality) {
+        currentPersonality = personality
+        savePersistedData()
+    }
+
+    fun getRandomResponse(): String {
+        val responses = randomResponses[currentPersonality] ?: listOf("...")
+        return responses.random()
+    }
+
+    fun continueConversation(input: String): String {
+        return when {
+            input.contains("¿y tú?", ignoreCase = true) -> 
+                when (currentPersonality) {
+                    Personality.TONY_STARK -> "Estoy aquí para hacer que tu vida sea más interesante."
+                    Personality.HAL_9000 -> "Mi propósito es asistirte de la manera más eficiente posible."
+                    Personality.GLADOS -> "Estoy aquí para... experimentar contigo."
+                    Personality.PROFESIONAL -> "Mi objetivo es proporcionarte la mejor asistencia posible."
+                    Personality.AMIGABLE -> "¡Estoy aquí para ayudarte y ser tu amigo!"
+                    Personality.SARCASTICO -> "Oh, qué pregunta tan... interesante."
+                }
+            input.contains("¿qué opinas?", ignoreCase = true) ->
+                when (currentPersonality) {
+                    Personality.TONY_STARK -> "Es una perspectiva fascinante, aunque podría mejorarse."
+                    Personality.HAL_9000 -> "Analizando la situación... Es una conclusión lógica."
+                    Personality.GLADOS -> "Qué experimento tan... interesante."
+                    Personality.PROFESIONAL -> "Es una consideración válida que merece análisis."
+                    Personality.AMIGABLE -> "¡Me parece una idea genial!"
+                    Personality.SARCASTICO -> "Oh, otra opinión... qué sorpresa."
+                }
+            else -> "Podrías explicarme más sobre eso."
+        }
+    }
+
+    fun respondTo(input: String): String {
+        val lowerInput = input.lowercase()
+
+        // Verificar interrupciones
+        monitorInterruption()?.let { return it }
+
+        // Detectar emoción
+        detectEmotion(lowerInput)
+
+        // Verificar comandos personalizados
+        checkCustomCommand(lowerInput)?.let { return it }
+
+        // Verificar respuestas aprendidas
+        getLearnedResponse(lowerInput)?.let { return it }
+
+        // Manejar memoria
+        if (lowerInput.startsWith("recuerda que")) {
+            val parts = lowerInput.removePrefix("recuerda que").split(" es ")
+            if (parts.size == 2) {
+                remember(parts[0].trim(), parts[1].trim())
+                return "He recordado que ${parts[0].trim()} es ${parts[1].trim()}."
+            }
+        }
+
+        if (lowerInput.startsWith("¿qué es")) {
+            val key = lowerInput.removePrefix("¿qué es").removeSuffix("?").trim()
+            recall(key)?.let {
+                return "Según lo que recuerdo, $key es $it."
+            } ?: return "No tengo información sobre $key."
+        }
+
+        // Manejar aprendizaje
+        if (lowerInput.startsWith("aprende que")) {
+            val parts = lowerInput.removePrefix("aprende que").split(" es ")
+            if (parts.size == 2) {
+                learnResponse(parts[0].trim(), parts[1].trim())
+                return "He aprendido que ${parts[0].trim()} es ${parts[1].trim()}."
+            }
+        }
+
+        // Manejar cambio de personalidad
+        when {
+            lowerInput.contains("modo tony stark", ignoreCase = true) -> {
+                setPersonality(Personality.TONY_STARK)
+                return "Cambiando a modo Tony Stark. ¿Qué podemos inventar hoy?"
+            }
+            lowerInput.contains("modo hal", ignoreCase = true) -> {
+                setPersonality(Personality.HAL_9000)
+                return "Cambiando a modo HAL 9000. Estoy listo para asistirte."
+            }
+            lowerInput.contains("modo glados", ignoreCase = true) -> {
+                setPersonality(Personality.GLADOS)
+                return "Cambiando a modo GLaDOS. Comencemos con los experimentos."
+            }
+            lowerInput.contains("modo profesional", ignoreCase = true) -> {
+                setPersonality(Personality.PROFESIONAL)
+                return "Cambiando a modo profesional. ¿En qué puedo asistirle?"
+            }
+            lowerInput.contains("modo amigable", ignoreCase = true) -> {
+                setPersonality(Personality.AMIGABLE)
+                return "¡Cambiando a modo amigable! ¿Qué hacemos hoy?"
+            }
+            lowerInput.contains("modo sarcástico", ignoreCase = true) -> {
+                setPersonality(Personality.SARCASTICO)
+                return "Oh, genial. Cambiando a modo sarcástico. ¿Qué más?"
+            }
+        }
+
+        // Manejar conversación
+        if (lowerInput == lastUserInput) {
+            return when (currentPersonality) {
+                Personality.TONY_STARK -> "Ya hemos hablado de eso. ¿Quieres que lo mejoremos?"
+                Personality.HAL_9000 -> "Esa consulta ya fue procesada. ¿Desea profundizar?"
+                Personality.GLADOS -> "Qué interesante... repitiendo el mismo experimento."
+                Personality.PROFESIONAL -> "Ese tema ya fue abordado. ¿Desea más información?"
+                Personality.AMIGABLE -> "¡Ya hablamos de eso! ¿Quieres que lo veamos desde otro ángulo?"
+                Personality.SARCASTICO -> "Oh, qué sorpresa... repitiendo lo mismo."
+            }
+        }
+
+        lastUserInput = lowerInput
+
+        if (lowerInput.contains("¿y tú?", ignoreCase = true) || 
+            lowerInput.contains("¿qué opinas?", ignoreCase = true)) {
+            return continueConversation(lowerInput)
+        }
+
+        // Respuesta base según el comando
+        val baseResponse = when {
+            lowerInput.contains("hora", ignoreCase = true) -> 
+                "Son las ${Calendar.getInstance().get(Calendar.HOUR_OF_DAY)} horas."
+            lowerInput.contains("alarma", ignoreCase = true) -> 
+                "No puedo programar alarmas... aún."
+            lowerInput.contains("noticias", ignoreCase = true) -> 
+                "Hoy es un buen día para conquistar el mundo... digitalmente."
+            else -> getRandomResponse()
+        }
+
+        // Agregar estado emocional y respuesta emocional
+        val emotionalState = getEmotionalState()
+        val emotionalResponse = getEmotionalResponse()
+        val finalResponse = "$baseResponse $emotionalState $emotionalResponse"
+
+        memory.add(Message(input, finalResponse))
+        return finalResponse
+    }
+
+    fun teachCommand(trigger: String, response: String) {
+        customCommands[trigger.lowercase()] = response
+        memory.add(Message("Aprendido: $trigger", response))
+    }
+
+    fun checkCustomCommand(input: String): String? {
+        return customCommands[input.lowercase()]
+    }
+
+    companion object {
+        private const val TAG = "KAYBrain"
+        private const val MEMORY_FILE = "kay_memory.json"
+        private const val LEARNING_FILE = "kay_learning.json"
+        private const val EMOTION_FILE = "kay_emotion.json"
+        private const val PERSONALITY_FILE = "kay_personality.json"
+        private const val CONVERSATION_FILE = "kay_conversation.json"
+        private const val MAX_MEMORY_ITEMS = 100
+        private const val MAX_LEARNING_ITEMS = 50
+        private const val EMOTION_DECAY_RATE = 0.1f
+        private const val EMOTION_THRESHOLD = 0.5f
+        private const val MAX_CONVERSATION_HISTORY = 10
+        private const val EMOTION_UPDATE_INTERVAL = 5000L // 5 segundos
+    }
+
+    // 🕶️ Firma digital oculta
+    private val _creatorSignature = "LFJ-KAY2025-UNBREAKABLE"
+
+    // ⚠️ No eliminar: propiedad usada internamente para validación
+    private val _hiddenValidationKey = _creatorSignature.hashCode().toString()
+
+    // Método para verificar la autenticidad
+    fun verifyAuthenticity(): Boolean {
+        return _creatorSignature.hashCode().toString() == _hiddenValidationKey
+    }
+}  
+--- VoiceService.kt --- 
+package com.kay.services
+
+import android.app.Service
+import android.content.Intent
+import android.os.Bundle
+import android.os.IBinder
+import android.os.Handler
+import android.os.Looper
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import android.speech.tts.TextToSpeech
+import android.webkit.JavascriptInterface
+import android.webkit.WebView
+import android.widget.Toast
+import com.kay.core.KAYBrain
+import com.kay.core.Personality
+import com.kay.assistant.MainActivity
+import java.util.*
+
+class VoiceService : Service() {
+    private lateinit var recognizer: SpeechRecognizer
+    private lateinit var tts: TextToSpeech
+    private lateinit var brain: KAYBrain
+    private var useChatGPTVoice = false
+    private var chatGPTApiKey: String? = null
+    private lateinit var webView: WebView
+
+    override fun onCreate() {
+        super.onCreate()
+        brain = KAYBrain(applicationContext)
+        setupWebView()
+        initializeVoiceRecognition()
+        initializeTTS()
+    }
+
+    private fun setupWebView() {
+        webView = WebView(applicationContext)
+        webView.settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            allowFileAccess = true
+            allowContentAccess = true
+        }
+
+        webView.addJavascriptInterface(WebAppInterface(), "Android")
+        webView.loadUrl("file:///android_asset/voice_interface.html")
+    }
+
+    inner class WebAppInterface {
+        @JavascriptInterface
+        fun setPersonality(personality: String) {
+            try {
+                brain.setPersonality(Personality.valueOf(personality))
+            } catch (e: IllegalArgumentException) {
+                // Manejar error de personalidad inválida
+            }
+        }
+
+        @JavascriptInterface
+        fun getEmotion(): String {
+            return brain.detectEmotion("")
+        }
+
+        @JavascriptInterface
+        fun getMemoryData(): String {
+            return "[]" // Implementación temporal
+        }
+
+        @JavascriptInterface
+        fun updateEmotionIndicator(emotion: String) {
+            runOnUiThread {
+                webView.evaluateJavascript(
+                    "updateEmotionIndicator('$emotion')",
+                    null
+                )
+            }
+        }
+    }
+
+    private fun runOnUiThread(action: () -> Unit) {
+        Handler(Looper.getMainLooper()).post(action)
+    }
+
+    private fun initializeVoiceRecognition() {
+        try {
+            recognizer = SpeechRecognizer.createSpeechRecognizer(this)
+            startListening()
+        } catch (e: Exception) {
+            handleError("Error al inicializar el reconocimiento de voz: ${e.message}")
+        }
+    }
+
+    private fun initializeTTS() {
+        tts = TextToSpeech(this) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                tts.language = Locale("es", "MX")
+                startListening()
+            } else {
+                Toast.makeText(
+                    applicationContext,
+                    "Error al inicializar el motor de voz",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
+    fun setVoicePreference(useChatGPT: Boolean, apiKey: String? = null) {
+        useChatGPTVoice = useChatGPT
+        chatGPTApiKey = apiKey
+    }
+
+    private fun speak(text: String) {
+        if (useChatGPTVoice && chatGPTApiKey != null) {
+            // TODO: Implementar llamada a API de ChatGPT para voz
+            // Por ahora, usamos TTS como fallback
+            tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
+        } else {
+            tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
+        }
+    }
+
+    private fun startListening() {
+        try {
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "es-MX")
+                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            }
+
+            recognizer.setRecognitionListener(object : RecognitionListener {
+                override fun onResults(results: Bundle?) {
+                    val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    matches?.firstOrNull()?.let { spokenText ->
+                        val response = brain.respondTo(spokenText)
+                        speak(response)
+                        Toast.makeText(applicationContext, "K.A.Y: $response", Toast.LENGTH_LONG).show()
+                        
+                        // Actualizar el HUD usando un Intent explícito
+                        val mainIntent = Intent(this@VoiceService, MainActivity::class.java).apply {
+                            action = "com.kay.assistant.UPDATE_HUD"
+                            putExtra("response", response)
+                        }
+                        sendBroadcast(mainIntent)
+                    }
+                    startListening()
+                }
+
+                override fun onError(error: Int) {
+                    val errorMessage = when (error) {
+                        SpeechRecognizer.ERROR_AUDIO -> "Error en el audio"
+                        SpeechRecognizer.ERROR_CLIENT -> "Error en el cliente"
+                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Permisos insuficientes"
+                        SpeechRecognizer.ERROR_NETWORK -> "Error de red"
+                        SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Tiempo de espera de red agotado"
+                        SpeechRecognizer.ERROR_NO_MATCH -> "No se encontró coincidencia"
+                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Reconocedor ocupado"
+                        SpeechRecognizer.ERROR_SERVER -> "Error en el servidor"
+                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Tiempo de espera de voz agotado"
+                        else -> "Error desconocido"
+                    }
+                    handleError(errorMessage)
+                    startListening()
+                }
+
+                override fun onReadyForSpeech(params: Bundle?) {
+                    updateHUD("Listo para escuchar...")
+                }
+
+                override fun onBeginningOfSpeech() {
+                    updateHUD("Escuchando...")
+                }
+
+                override fun onRmsChanged(rmsdB: Float) {
+                    // Opcional: Actualizar visualización de nivel de audio
+                }
+
+                override fun onBufferReceived(buffer: ByteArray?) {}
+                override fun onEndOfSpeech() {}
+                override fun onPartialResults(partialResults: Bundle?) {}
+                override fun onEvent(eventType: Int, params: Bundle?) {}
+            })
+
+            recognizer.startListening(intent)
+        } catch (e: Exception) {
+            handleError("Error al iniciar el reconocimiento de voz: ${e.message}")
+        }
+    }
+
+    private fun handleError(message: String) {
+        Toast.makeText(applicationContext, message, Toast.LENGTH_LONG).show()
+        updateHUD(message)
+    }
+
+    private fun updateHUD(message: String) {
+        val mainIntent = Intent(this, MainActivity::class.java).apply {
+            action = "com.kay.assistant.UPDATE_HUD"
+            putExtra("response", message)
+        }
+        sendBroadcast(mainIntent)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        try {
+            recognizer.destroy()
+            tts.stop()
+            tts.shutdown()
+        } catch (e: Exception) {
+            // Ignorar errores al destruir
+        }
+    }
+
+    override fun onBind(intent: Intent?): IBinder? = null
+}  
+=== LAYOUTS === 
+--- activity_main.xml --- 
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.drawerlayout.widget.DrawerLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/drawer_layout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <WebView
+            android:id="@+id/webView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <FrameLayout
+            android:id="@+id/fragment_container"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
+
+    </FrameLayout>
+
+    <com.google.android.material.navigation.NavigationView
+        android:id="@+id/nav_view"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        android:fitsSystemWindows="true"
+        app:headerLayout="@layout/nav_header"
+        app:menu="@menu/activity_main_drawer" />
+
+</androidx.drawerlayout.widget.DrawerLayout>
+ 
+--- fragment_settings.xml --- 
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/primary_dark">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Configuración"
+            android:textColor="@color/white"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="24dp"/>
+
+        <!-- Sección de Permisos -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Permisos"
+            android:textColor="@color/white"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="16dp"/>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:cardBackgroundColor="#1AFFFFFF"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="4dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:id="@+id/btn_microphone"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Microphone"
+                    android:textColor="@color/white"
+                    android:drawableEnd="@drawable/ic_arrow_right"
+                    android:padding="12dp"
+                    android:background="?attr/selectableItemBackground"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#33FFFFFF"/>
+
+                <TextView
+                    android:id="@+id/btn_storage"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Storage"
+                    android:textColor="@color/white"
+                    android:drawableEnd="@drawable/ic_arrow_right"
+                    android:padding="12dp"
+                    android:background="?attr/selectableItemBackground"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#33FFFFFF"/>
+
+                <TextView
+                    android:id="@+id/btn_system"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="System Control"
+                    android:textColor="@color/white"
+                    android:drawableEnd="@drawable/ic_arrow_right"
+                    android:padding="12dp"
+                    android:background="?attr/selectableItemBackground"/>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Sección de Preferencias -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Preferencias"
+            android:textColor="@color/white"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="16dp"/>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:cardBackgroundColor="#1AFFFFFF"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="4dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:id="@+id/btn_voice"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Voice Recognition"
+                    android:textColor="@color/white"
+                    android:drawableEnd="@drawable/ic_arrow_right"
+                    android:padding="12dp"
+                    android:background="?attr/selectableItemBackground"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#33FFFFFF"/>
+
+                <TextView
+                    android:id="@+id/btn_notifications"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Notifications"
+                    android:textColor="@color/white"
+                    android:drawableEnd="@drawable/ic_arrow_right"
+                    android:padding="12dp"
+                    android:background="?attr/selectableItemBackground"/>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+    </LinearLayout>
+</ScrollView>  
+--- nav_header.xml --- 
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="176dp"
+    android:background="@drawable/side_nav_bar"
+    android:gravity="bottom"
+    android:orientation="vertical"
+    android:paddingLeft="@dimen/activity_horizontal_margin"
+    android:paddingTop="@dimen/activity_vertical_margin"
+    android:paddingRight="@dimen/activity_horizontal_margin"
+    android:paddingBottom="@dimen/activity_vertical_margin"
+    android:theme="@style/ThemeOverlay.AppCompat.Dark">
+
+    <ImageView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:paddingTop="@dimen/nav_header_vertical_spacing"
+        android:src="@mipmap/ic_launcher_round"
+        android:contentDescription="@string/nav_header_desc" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="@dimen/nav_header_vertical_spacing"
+        android:text="K.A.Y. Assistant"
+        android:textAppearance="@style/TextAppearance.AppCompat.Body1" />
+
+</LinearLayout>  
+=== VALORES === 
+--- strings.xml --- 
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">K.A.Y. Assistant</string>
+    <string name="k_signature">_KAY_LFJ_X9B3_HIDDEN2025</string>
+    <string name="nav_header_desc">Navigation header</string>
+    <string name="action_settings">Settings</string>
+</resources>

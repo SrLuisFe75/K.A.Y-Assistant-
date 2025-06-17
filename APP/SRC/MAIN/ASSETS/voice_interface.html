@@ -1,0 +1,1491 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI Voice Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        .phone-container {
+            width: 100%;
+            height: 100%;
+            background: #000;
+            position: relative;
+        }
+
+        .screen {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, #0a0a0f 0%, #1a1a2e 30%, #16213e 70%, #0f3460 100%);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 24px;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            z-index: 100;
+            position: relative;
+        }
+
+        .menu-button {
+            width: 24px;
+            height: 24px;
+            position: relative;
+            cursor: pointer;
+            z-index: 1000;
+        }
+
+        .menu-button span {
+            display: block;
+            width: 100%;
+            height: 2px;
+            background: white;
+            position: absolute;
+            transition: all 0.3s ease;
+        }
+
+        .menu-button span:nth-child(1) { top: 0; }
+        .menu-button span:nth-child(2) { top: 50%; transform: translateY(-50%); }
+        .menu-button span:nth-child(3) { bottom: 0; }
+
+        .menu-button.active span:nth-child(1) {
+            transform: rotate(45deg);
+            top: 50%;
+        }
+
+        .menu-button.active span:nth-child(2) {
+            opacity: 0;
+        }
+
+        .menu-button.active span:nth-child(3) {
+            transform: rotate(-45deg);
+            bottom: 50%;
+        }
+
+        .side-menu {
+            position: fixed;
+            top: 0;
+            left: -300px;
+            width: 300px;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.95) 0%, rgba(118, 75, 162, 0.95) 100%);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            z-index: 999;
+            transition: transform 0.3s ease;
+            box-shadow: 5px 0 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .side-menu.active {
+            transform: translateX(300px);
+        }
+
+        .menu-header {
+            padding: 20px;
+            color: white;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .menu-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .menu-subtitle {
+            font-size: 14px;
+            opacity: 0.8;
+        }
+
+        .menu-search {
+            padding: 15px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .search-container {
+            position: relative;
+            margin-bottom: 10px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 40px 12px 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            color: white;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .search-input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .search-icon {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: rgba(255, 255, 255, 0.5);
+            pointer-events: none;
+        }
+
+        .menu-categories {
+            display: flex;
+            gap: 10px;
+            padding: 0 20px 15px;
+            overflow-x: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .menu-categories::-webkit-scrollbar {
+            display: none;
+        }
+
+        .category-pill {
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            color: white;
+            font-size: 12px;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .category-pill:hover,
+        .category-pill.active {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .menu-content {
+            padding: 20px;
+            height: calc(100% - 80px);
+            overflow-y: auto;
+        }
+
+        .menu-section {
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px;
+            margin-bottom: 10px;
+            padding: 0 20px;
+        }
+
+        .voice-options {
+            padding: 15px 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .voice-option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .voice-option input[type="radio"] {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            outline: none;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .voice-option input[type="radio"]:checked {
+            border-color: #fff;
+        }
+
+        .voice-option input[type="radio"]:checked::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 10px;
+            height: 10px;
+            background: #fff;
+            border-radius: 50%;
+        }
+
+        .voice-option label {
+            color: white;
+            cursor: pointer;
+        }
+
+        .api-key-input {
+            width: 100%;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: white;
+            margin-top: 10px;
+            font-size: 12px;
+        }
+
+        .api-key-input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .personality-selector {
+            padding: 15px 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .personality-option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .personality-option:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .personality-option.active {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .personality-icon {
+            font-size: 20px;
+        }
+
+        .personality-info {
+            flex: 1;
+        }
+
+        .personality-name {
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .personality-description {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .routine-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 10px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .routine-icon {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            font-size: 20px;
+        }
+
+        .routine-content {
+            flex: 1;
+        }
+
+        .routine-title {
+            font-weight: 600;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .routine-description {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .routine-item:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateX(5px);
+        }
+
+        .routine-item.hidden {
+            display: none;
+        }
+
+        .status-right {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .signal-bar {
+            width: 4px;
+            background: white;
+            border-radius: 1px;
+        }
+
+        .signal-bar:nth-child(1) { height: 4px; }
+        .signal-bar:nth-child(2) { height: 6px; }
+        .signal-bar:nth-child(3) { height: 8px; }
+        .signal-bar:nth-child(4) { height: 10px; }
+
+        .battery {
+            width: 24px;
+            height: 12px;
+            border: 1px solid white;
+            border-radius: 2px;
+            position: relative;
+        }
+
+        .battery::after {
+            content: '';
+            position: absolute;
+            right: -3px;
+            top: 3px;
+            width: 2px;
+            height: 6px;
+            background: white;
+            border-radius: 0 1px 1px 0;
+        }
+
+        .battery-fill {
+            width: 80%;
+            height: 100%;
+            background: white;
+            border-radius: 1px;
+        }
+
+        .three-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        .content-area {
+            flex: 1;
+            position: relative;
+            z-index: 10;
+        }
+
+        .main-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            padding: 40px;
+        }
+
+        .orb-space {
+            height: 240px;
+            margin-bottom: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .buttons {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 18px;
+            border: none;
+            border-radius: 16px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.4s ease;
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.4), rgba(118, 75, 162, 0.4));
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn:active {
+            transform: translateY(-3px) scale(1.02);
+        }
+
+        .floating-elements {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .floating-element {
+            position: absolute;
+            width: 3px;
+            height: 3px;
+            background: rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            animation: float-particle 15s linear infinite;
+        }
+
+        @keyframes float-particle {
+            0% { 
+                opacity: 0; 
+                transform: translateY(100vh) translateX(0) scale(0); 
+            }
+            10% { 
+                opacity: 1; 
+                transform: translateY(90vh) translateX(30px) scale(1); 
+            }
+            90% { 
+                opacity: 1; 
+                transform: translateY(10vh) translateX(-30px) scale(1); 
+            }
+            100% { 
+                opacity: 0; 
+                transform: translateY(-10vh) translateX(0) scale(0); 
+            }
+        }
+
+        .menu-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            z-index: 998;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .menu-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .wave-effect {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 70%);
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        @keyframes waveExpand {
+            0% {
+                width: 0;
+                height: 0;
+                opacity: 0.5;
+            }
+            100% {
+                width: 200%;
+                height: 200%;
+                opacity: 0;
+            }
+        }
+
+        .personality-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            padding: 0 20px;
+        }
+
+        .personality-card {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .personality-card:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .personality-card.active {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .personality-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .personality-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .personality-description {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .memory-section {
+            padding: 15px 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .memory-item {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+        }
+
+        .memory-key {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .memory-value {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .emotion-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .emotion-icon {
+            font-size: 20px;
+        }
+
+        .emotion-text {
+            font-size: 14px;
+        }
+
+        .verification-glow {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0) 70%);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 1000;
+        }
+
+        .verification-glow.active {
+            opacity: 1;
+            animation: glowPulse 1s ease-out;
+        }
+
+        @keyframes glowPulse {
+            0% { transform: scale(0.5); opacity: 0; }
+            50% { transform: scale(1); opacity: 0.5; }
+            100% { transform: scale(1.5); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-container">
+        <div class="screen">
+            <div class="status-bar">
+                <div class="menu-button" id="menuButton">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+                <span id="time">9:41</span>
+                <div class="status-right">
+                    <div class="signal-bars">
+                        <div class="signal-bar"></div>
+                        <div class="signal-bar"></div>
+                        <div class="signal-bar"></div>
+                        <div class="signal-bar"></div>
+                    </div>
+                    <div class="battery">
+                        <div class="battery-fill"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="three-container" id="threeContainer"></div>
+            <div class="floating-elements" id="floatingElements"></div>
+
+            <div class="content-area">
+                <div class="main-screen">
+                    <div class="orb-space"></div>
+                    <div class="buttons">
+                        <button class="btn btn-primary" onclick="Android.signUp()">Sign Up</button>
+                        <button class="btn btn-secondary" onclick="Android.signIn()">Sign In</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="menu-overlay" id="menuOverlay"></div>
+    <div class="side-menu" id="sideMenu">
+        <div class="menu-header">
+            <div class="menu-title">K.A.Y. Assistant</div>
+            <div class="menu-subtitle">Rutinas y Configuración</div>
+        </div>
+        <div class="menu-search">
+            <div class="search-container">
+                <input type="text" class="search-input" placeholder="Buscar rutinas..." id="routineSearch">
+                <div class="search-icon">🔍</div>
+            </div>
+            <div class="menu-categories">
+                <div class="category-pill active" data-category="all">Todas</div>
+                <div class="category-pill" data-category="daily">Diarias</div>
+                <div class="category-pill" data-category="special">Especiales</div>
+                <div class="category-pill" data-category="favorites">Favoritas</div>
+            </div>
+        </div>
+        <div class="menu-content">
+            <div class="menu-section">
+                <div class="section-title">Rutinas Diarias</div>
+                <div class="routine-item" data-category="daily" onclick="activateRoutine('morning')">
+                    <div class="routine-icon">☀️</div>
+                    <div class="routine-content">
+                        <div class="routine-title">Buenos Días</div>
+                        <div class="routine-description">Clima, tráfico, eventos y música matutina</div>
+                    </div>
+                </div>
+                <div class="routine-item" data-category="daily" onclick="activateRoutine('night')">
+                    <div class="routine-icon">🌙</div>
+                    <div class="routine-content">
+                        <div class="routine-title">Buenas Noches</div>
+                        <div class="routine-description">Apagar luces, activar seguridad y sonidos relajantes</div>
+                    </div>
+                </div>
+                <div class="routine-item" data-category="daily" onclick="activateRoutine('home')">
+                    <div class="routine-icon">🏠</div>
+                    <div class="routine-content">
+                        <div class="routine-title">Llegada a Casa</div>
+                        <div class="routine-description">Luces, temperatura y música</div>
+                    </div>
+                </div>
+                <div class="routine-item" data-category="daily" onclick="activateRoutine('away')">
+                    <div class="routine-icon">🚗</div>
+                    <div class="routine-content">
+                        <div class="routine-title">Salida de Casa</div>
+                        <div class="routine-description">Seguridad y notificaciones</div>
+                    </div>
+                </div>
+            </div>
+            <div class="menu-section">
+                <div class="section-title">Rutinas Especiales</div>
+                <div class="routine-item" data-category="special" onclick="activateRoutine('rest')">
+                    <div class="routine-icon">💤</div>
+                    <div class="routine-content">
+                        <div class="routine-title">Hora de Descansar</div>
+                        <div class="routine-description">Luz tenue y sonidos relajantes</div>
+                    </div>
+                </div>
+                <div class="routine-item" data-category="special" onclick="activateRoutine('study')">
+                    <div class="routine-icon">📚</div>
+                    <div class="routine-content">
+                        <div class="routine-title">Hora de Estudiar</div>
+                        <div class="routine-description">Música instrumental y temporizadores</div>
+                    </div>
+                </div>
+                <div class="routine-item" data-category="special" onclick="activateRoutine('meditation')">
+                    <div class="routine-icon">🧘</div>
+                    <div class="routine-content">
+                        <div class="routine-title">Meditación</div>
+                        <div class="routine-description">Sesiones guiadas y ambiente relajante</div>
+                    </div>
+                </div>
+            </div>
+            <div class="menu-section">
+                <div class="section-title">Personalidad</div>
+                <div class="personality-grid">
+                    <div class="personality-card active" data-personality="TONY_STARK">
+                        <div class="personality-icon">🤖</div>
+                        <div class="personality-name">Tony Stark</div>
+                        <div class="personality-description">Sarcástico y brillante</div>
+                    </div>
+                    <div class="personality-card" data-personality="HAL_9000">
+                        <div class="personality-icon">👁️</div>
+                        <div class="personality-name">HAL 9000</div>
+                        <div class="personality-description">Preciso y misterioso</div>
+                    </div>
+                    <div class="personality-card" data-personality="GLADOS">
+                        <div class="personality-icon">🧪</div>
+                        <div class="personality-name">GLaDOS</div>
+                        <div class="personality-description">Sarcástico y científico</div>
+                    </div>
+                    <div class="personality-card" data-personality="PROFESIONAL">
+                        <div class="personality-icon">👔</div>
+                        <div class="personality-name">Profesional</div>
+                        <div class="personality-description">Formal y eficiente</div>
+                    </div>
+                    <div class="personality-card" data-personality="AMIGABLE">
+                        <div class="personality-icon">😊</div>
+                        <div class="personality-name">Amigable</div>
+                        <div class="personality-description">Cercano y empático</div>
+                    </div>
+                    <div class="personality-card" data-personality="SARCASTICO">
+                        <div class="personality-icon">😏</div>
+                        <div class="personality-name">Sarcástico</div>
+                        <div class="personality-description">Irónico y divertido</div>
+                    </div>
+                </div>
+            </div>
+            <div class="memory-section">
+                <div class="section-title">Memoria</div>
+                <div class="memory-item">
+                    <div class="memory-key">Comandos Aprendidos</div>
+                    <div class="memory-value">K.A.Y. recuerda tus preferencias y comandos personalizados</div>
+                </div>
+                <div class="memory-item">
+                    <div class="memory-key">Preferencias</div>
+                    <div class="memory-value">Tus configuraciones y ajustes guardados</div>
+                </div>
+            </div>
+            <div class="emotion-indicator">
+                <div class="emotion-icon">😊</div>
+                <div class="emotion-text">Estado emocional: Neutral</div>
+            </div>
+            <div class="voice-options">
+                <div class="section-title">Configuración de Voz</div>
+                <div class="voice-option">
+                    <input type="radio" id="androidVoice" name="voice" checked>
+                    <label for="androidVoice">Voz del Sistema</label>
+                </div>
+                <div class="voice-option">
+                    <input type="radio" id="chatGPTVoice" name="voice">
+                    <label for="chatGPTVoice">Voz Natural (ChatGPT)</label>
+                </div>
+                <input type="text" class="api-key-input" placeholder="API Key de ChatGPT (opcional)" id="chatGPTApiKey">
+            </div>
+        </div>
+    </div>
+
+    <div class="verification-glow" id="verificationGlow"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Variables globales
+        let scene, camera, renderer, orb, cottonCandy;
+        let mouseX = 0, mouseY = 0;
+        let time = 0;
+
+        // Inicializar Three.js
+        function initThree() {
+            const container = document.getElementById('threeContainer');
+            
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, container.offsetWidth / container.offsetHeight, 0.1, 1000);
+            camera.position.z = 5;
+            
+            renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            renderer.setSize(container.offsetWidth, container.offsetHeight);
+            renderer.setClearColor(0x000000, 0);
+            container.appendChild(renderer.domElement);
+            
+            createOrb();
+            createLights();
+            animate();
+        }
+
+        // Crear la esfera perfecta
+        function createOrb() {
+            const geometry = new THREE.SphereGeometry(1.2, 64, 64);
+            const material = new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 },
+                    colorA: { value: new THREE.Color(0x667eea) },
+                    colorB: { value: new THREE.Color(0x764ba2) },
+                    colorC: { value: new THREE.Color(0xf093fb) }
+                },
+                vertexShader: `
+                    varying vec2 vUv;
+                    varying vec3 vNormal;
+                    uniform float time;
+                    
+                    void main() {
+                        vUv = uv;
+                        vNormal = normal;
+                        
+                        vec3 pos = position;
+                        pos += 0.03 * sin(pos.x * 8.0 + time * 2.0) * normal;
+                        pos += 0.02 * sin(pos.y * 10.0 + time * 1.5) * normal;
+                        
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform float time;
+                    uniform vec3 colorA;
+                    uniform vec3 colorB;
+                    uniform vec3 colorC;
+                    varying vec2 vUv;
+                    varying vec3 vNormal;
+                    
+                    void main() {
+                        vec2 uv = vUv;
+                        
+                        float noise = sin(uv.x * 10.0 + time) * sin(uv.y * 10.0 + time * 0.8);
+                        
+                        vec3 color = mix(colorA, colorB, uv.x + noise * 0.1);
+                        color = mix(color, colorC, uv.y + noise * 0.05);
+                        
+                        float fresnel = pow(1.0 - dot(normalize(vNormal), vec3(0.0, 0.0, 1.0)), 2.0);
+                        color += fresnel * 0.4;
+                        
+                        gl_FragColor = vec4(color, 0.8);
+                    }
+                `,
+                transparent: true,
+                side: THREE.DoubleSide
+            });
+            
+            orb = new THREE.Mesh(geometry, material);
+            orb.position.set(0, 0.5, 0);
+            scene.add(orb);
+            
+            const cottonGeometry = new THREE.SphereGeometry(0.8, 32, 32);
+            const cottonMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 },
+                    colorShift: { value: new THREE.Color(0x667eea) }
+                },
+                vertexShader: `
+                    varying vec2 vUv;
+                    uniform float time;
+                    
+                    void main() {
+                        vUv = uv;
+                        
+                        vec3 pos = position;
+                        pos += 0.3 * sin(pos.x * 4.0 + time) * normalize(pos);
+                        pos += 0.25 * sin(pos.y * 6.0 + time * 1.3) * normalize(pos);
+                        pos += 0.2 * sin(pos.z * 8.0 + time * 0.8) * normalize(pos);
+                        
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform float time;
+                    uniform vec3 colorShift;
+                    varying vec2 vUv;
+                    
+                    void main() {
+                        vec2 uv = vUv;
+                        
+                        float noise1 = sin(uv.x * 25.0 + time) * sin(uv.y * 25.0 + time * 1.2);
+                        float noise2 = sin(uv.x * 50.0 + time * 1.8) * 0.6;
+                        float noise3 = sin(uv.y * 75.0 + time * 0.9) * 0.4;
+                        
+                        float combined = noise1 + noise2 + noise3;
+                        
+                        vec3 baseColor = colorShift;
+                        vec3 accentColor1 = vec3(1.0, 0.4, 0.8);
+                        vec3 accentColor2 = vec3(0.4, 0.9, 1.0);
+                        
+                        vec3 finalColor = mix(baseColor, accentColor1, combined * 0.4);
+                        finalColor = mix(finalColor, accentColor2, sin(time) * 0.3);
+                        
+                        float alpha = 0.8 + combined * 0.3;
+                        alpha = smoothstep(0.4, 1.0, alpha);
+                        
+                        gl_FragColor = vec4(finalColor, alpha * 0.9);
+                    }
+                `,
+                transparent: true,
+                side: THREE.DoubleSide
+            });
+            
+            cottonCandy = new THREE.Mesh(cottonGeometry, cottonMaterial);
+            cottonCandy.position.set(0, 0.5, 0);
+            scene.add(cottonCandy);
+        }
+
+        function createLights() {
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+            scene.add(ambientLight);
+            
+            const pointLight = new THREE.PointLight(0x667eea, 1.2, 100);
+            pointLight.position.set(0, 8, 8);
+            scene.add(pointLight);
+            
+            const pointLight2 = new THREE.PointLight(0x764ba2, 1.0, 100);
+            pointLight2.position.set(-8, -8, 8);
+            scene.add(pointLight2);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            time += 0.015;
+            
+            if (orb) {
+                orb.rotation.y += 0.008;
+                orb.rotation.x += 0.003;
+                orb.material.uniforms.time.value = time;
+                
+                orb.position.x += (mouseX * 0.0008 - orb.position.x) * 0.08;
+                orb.position.y += (0.5 + mouseY * 0.0008 - orb.position.y) * 0.08;
+            }
+            
+            if (cottonCandy) {
+                cottonCandy.rotation.y -= 0.01;
+                cottonCandy.rotation.z += 0.005;
+                cottonCandy.material.uniforms.time.value = time;
+                
+                const hue = (time * 0.1) % 1;
+                const color = new THREE.Color().setHSL(hue * 0.3 + 0.6, 0.8, 0.7);
+                cottonCandy.material.uniforms.colorShift.value = color;
+            }
+            
+            camera.position.x += (mouseX * 0.0003 - camera.position.x) * 0.05;
+            camera.position.y += (-mouseY * 0.0003 - camera.position.y) * 0.05;
+            camera.lookAt(scene.position);
+            
+            renderer.render(scene, camera);
+        }
+
+        function createFloatingElements() {
+            const container = document.getElementById('floatingElements');
+            
+            for (let i = 0; i < 30; i++) {
+                const element = document.createElement('div');
+                element.className = 'floating-element';
+                element.style.left = Math.random() * 100 + '%';
+                element.style.animationDelay = Math.random() * 15 + 's';
+                element.style.animationDuration = (Math.random() * 10 + 10) + 's';
+                container.appendChild(element);
+            }
+        }
+
+        function updateTime() {
+            const now = new Date();
+            const hours = now.getHours().toString().padStart(2, '0');
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+            document.getElementById('time').textContent = `${hours}:${minutes}`;
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('threeContainer');
+            if (container && camera && renderer) {
+                camera.aspect = container.offsetWidth / container.offsetHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(container.offsetWidth, container.offsetHeight);
+            }
+        }
+
+        // Menú lateral
+        const menuButton = document.getElementById('menuButton');
+        const sideMenu = document.getElementById('sideMenu');
+        const menuOverlay = document.getElementById('menuOverlay');
+
+        function toggleMenu() {
+            menuButton.classList.toggle('active');
+            sideMenu.classList.toggle('active');
+            menuOverlay.classList.toggle('active');
+        }
+
+        menuButton.addEventListener('click', toggleMenu);
+        menuOverlay.addEventListener('click', toggleMenu);
+
+        function activateRoutine(routine) {
+            // Definir los colores para cada rutina
+            const routineColors = {
+                morning: {
+                    a: 0xffd700, // Dorado cálido
+                    b: 0xff8c00, // Naranja
+                    c: 0xff4500  // Rojo anaranjado
+                },
+                night: {
+                    a: 0x1a237e, // Azul oscuro
+                    b: 0x311b92, // Púrpura oscuro
+                    c: 0x4a148c  // Púrpura profundo
+                },
+                home: {
+                    a: 0x4caf50, // Verde
+                    b: 0x8bc34a, // Verde claro
+                    c: 0xcddc39  // Verde lima
+                },
+                away: {
+                    a: 0x2196f3, // Azul
+                    b: 0x03a9f4, // Azul claro
+                    c: 0x00bcd4  // Azul cyan
+                },
+                rest: {
+                    a: 0x9c27b0, // Púrpura
+                    b: 0x673ab7, // Púrpura profundo
+                    c: 0x3f51b5  // Índigo
+                },
+                study: {
+                    a: 0x009688, // Verde azulado
+                    b: 0x00796b, // Verde azulado oscuro
+                    c: 0x004d40  // Verde azulado profundo
+                },
+                meditation: {
+                    a: 0x795548, // Marrón
+                    b: 0x5d4037, // Marrón oscuro
+                    c: 0x3e2723  // Marrón profundo
+                }
+            };
+
+            // Obtener los colores para la rutina seleccionada
+            const colors = routineColors[routine] || {
+                a: 0x667eea,
+                b: 0x764ba2,
+                c: 0xf093fb
+            };
+
+            // Crear efecto de onda
+            const wave = document.createElement('div');
+            wave.className = 'wave-effect';
+            document.querySelector('.screen').appendChild(wave);
+
+            // Animar la onda
+            wave.style.animation = 'waveExpand 1.5s ease-out forwards';
+
+            // Remover la onda después de la animación
+            setTimeout(() => {
+                wave.remove();
+            }, 1500);
+
+            // Animar la transición de colores
+            if (orb) {
+                // Guardar los colores originales
+                const originalColors = {
+                    a: orb.material.uniforms.colorA.value.clone(),
+                    b: orb.material.uniforms.colorB.value.clone(),
+                    c: orb.material.uniforms.colorC.value.clone()
+                };
+
+                // Crear los nuevos colores
+                const newColors = {
+                    a: new THREE.Color(colors.a),
+                    b: new THREE.Color(colors.b),
+                    c: new THREE.Color(colors.c)
+                };
+
+                // Animar la transición
+                let progress = 0;
+                const duration = 1000; // 1 segundo
+                const startTime = Date.now();
+
+                function animateTransition() {
+                    const currentTime = Date.now();
+                    progress = Math.min((currentTime - startTime) / duration, 1);
+
+                    // Función de suavizado
+                    const smoothProgress = progress < 0.5
+                        ? 2 * progress * progress
+                        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+                    // Interpolar entre los colores originales y nuevos
+                    orb.material.uniforms.colorA.value.lerpColors(
+                        originalColors.a,
+                        newColors.a,
+                        smoothProgress
+                    );
+                    orb.material.uniforms.colorB.value.lerpColors(
+                        originalColors.b,
+                        newColors.b,
+                        smoothProgress
+                    );
+                    orb.material.uniforms.colorC.value.lerpColors(
+                        originalColors.c,
+                        newColors.c,
+                        smoothProgress
+                    );
+
+                    if (progress < 1) {
+                        requestAnimationFrame(animateTransition);
+                    }
+                }
+
+                animateTransition();
+
+                // Modificar el efecto de pulso para que sea más suave
+                const originalScale = orb.scale.clone();
+                const targetScale = originalScale.clone().multiplyScalar(1.15);
+                
+                let pulseProgress = 0;
+                const pulseDuration = 600;
+                const pulseStartTime = Date.now();
+
+                function animatePulse() {
+                    const currentTime = Date.now();
+                    pulseProgress = Math.min((currentTime - pulseStartTime) / pulseDuration, 1);
+
+                    // Función de suavizado para el pulso
+                    const smoothPulse = pulseProgress < 0.5
+                        ? 4 * pulseProgress * pulseProgress * pulseProgress
+                        : 1 - Math.pow(-2 * pulseProgress + 2, 3) / 2;
+
+                    // Interpolar la escala
+                    orb.scale.lerpVectors(originalScale, targetScale, smoothPulse);
+
+                    if (pulseProgress < 1) {
+                        requestAnimationFrame(animatePulse);
+                    } else {
+                        // Volver a la escala original suavemente
+                        let returnProgress = 0;
+                        const returnDuration = 400;
+                        const returnStartTime = Date.now();
+
+                        function animateReturn() {
+                            const currentTime = Date.now();
+                            returnProgress = Math.min((currentTime - returnStartTime) / returnDuration, 1);
+
+                            // Función de suavizado para el retorno
+                            const smoothReturn = returnProgress < 0.5
+                                ? 4 * returnProgress * returnProgress * returnProgress
+                                : 1 - Math.pow(-2 * returnProgress + 2, 3) / 2;
+
+                            // Interpolar la escala de vuelta
+                            orb.scale.lerpVectors(targetScale, originalScale, smoothReturn);
+
+                            if (returnProgress < 1) {
+                                requestAnimationFrame(animateReturn);
+                            }
+                        }
+
+                        animateReturn();
+                    }
+                }
+
+                animatePulse();
+            }
+
+            // Cerrar el menú
+            toggleMenu();
+
+            // Mostrar feedback visual
+            const feedback = document.createElement('div');
+            feedback.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(255, 255, 255, 0.1);
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+                padding: 20px 40px;
+                border-radius: 20px;
+                color: white;
+                font-size: 18px;
+                font-weight: 600;
+                opacity: 0;
+                transition: opacity 0.3s ease;
+                z-index: 1000;
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            `;
+            feedback.textContent = `Activando rutina: ${routine}`;
+            document.body.appendChild(feedback);
+
+            // Animar la aparición y desaparición del feedback
+            setTimeout(() => {
+                feedback.style.opacity = '1';
+                setTimeout(() => {
+                    feedback.style.opacity = '0';
+                    setTimeout(() => {
+                        document.body.removeChild(feedback);
+                    }, 300);
+                }, 1000);
+            }, 0);
+        }
+
+        // Event listeners
+        document.addEventListener('touchmove', (event) => {
+            mouseX = event.touches[0].clientX - window.innerWidth / 2;
+            mouseY = event.touches[0].clientY - window.innerHeight / 2;
+        });
+
+        document.addEventListener('touchstart', (event) => {
+            mouseX = event.touches[0].clientX - window.innerWidth / 2;
+            mouseY = event.touches[0].clientY - window.innerHeight / 2;
+            
+            if (orb && cottonCandy) {
+                orb.scale.set(1.2, 1.2, 1.2);
+                cottonCandy.scale.set(1.3, 1.3, 1.3);
+                setTimeout(() => {
+                    orb.scale.set(1, 1, 1);
+                    cottonCandy.scale.set(1, 1, 1);
+                }, 200);
+            }
+        });
+
+        window.addEventListener('resize', onWindowResize);
+
+        // Inicializar
+        document.addEventListener('DOMContentLoaded', function() {
+            initThree();
+            createFloatingElements();
+            updateTime();
+            setInterval(updateTime, 60000);
+        });
+
+        // Búsqueda y filtrado de rutinas
+        const searchInput = document.getElementById('routineSearch');
+        const categoryPills = document.querySelectorAll('.category-pill');
+        const routineItems = document.querySelectorAll('.routine-item');
+
+        function filterRoutines() {
+            const searchTerm = searchInput.value.toLowerCase();
+            const activeCategory = document.querySelector('.category-pill.active').dataset.category;
+
+            routineItems.forEach(item => {
+                const title = item.querySelector('.routine-title').textContent.toLowerCase();
+                const description = item.querySelector('.routine-description').textContent.toLowerCase();
+                const category = item.dataset.category;
+
+                const matchesSearch = title.includes(searchTerm) || description.includes(searchTerm);
+                const matchesCategory = activeCategory === 'all' || category === activeCategory;
+
+                item.classList.toggle('hidden', !(matchesSearch && matchesCategory));
+            });
+        }
+
+        searchInput.addEventListener('input', filterRoutines);
+
+        categoryPills.forEach(pill => {
+            pill.addEventListener('click', () => {
+                categoryPills.forEach(p => p.classList.remove('active'));
+                pill.classList.add('active');
+                filterRoutines();
+            });
+        });
+
+        // Configuración de voz y personalidad
+        const voiceOptions = document.querySelectorAll('input[name="voice"]');
+        const apiKeyInput = document.getElementById('chatGPTApiKey');
+        const personalityCards = document.querySelectorAll('.personality-card');
+
+        voiceOptions.forEach(option => {
+            option.addEventListener('change', (e) => {
+                const useChatGPT = e.target.id === 'chatGPTVoice';
+                const apiKey = useChatGPT ? apiKeyInput.value : null;
+                // TODO: Implementar cambio de voz
+            });
+        });
+
+        // Configuración de personalidad
+        const emotionIndicator = document.querySelector('.emotion-indicator');
+        const emotionIcon = emotionIndicator.querySelector('.emotion-icon');
+        const emotionText = emotionIndicator.querySelector('.emotion-text');
+        const memorySection = document.querySelector('.memory-section');
+
+        // Función para actualizar la memoria
+        function updateMemoryData() {
+            try {
+                const memoryData = JSON.parse(Android.getMemoryData());
+                const memoryItems = memorySection.querySelectorAll('.memory-item');
+                
+                memoryItems.forEach(item => {
+                    const key = item.querySelector('.memory-key').textContent;
+                    if (memoryData[key]) {
+                        item.querySelector('.memory-value').textContent = memoryData[key];
+                    }
+                });
+            } catch (error) {
+                console.error('Error al actualizar memoria:', error);
+            }
+        }
+
+        // Función para actualizar el estado emocional
+        function updateEmotionState() {
+            try {
+                const emotion = Android.getEmotion();
+                updateEmotionIndicator(emotion.toLowerCase());
+            } catch (error) {
+                console.error('Error al actualizar emoción:', error);
+            }
+        }
+
+        // Configurar eventos de personalidad
+        personalityCards.forEach(card => {
+            card.addEventListener('click', () => {
+                personalityCards.forEach(c => c.classList.remove('active'));
+                card.classList.add('active');
+                const personality = card.dataset.personality;
+                try {
+                    Android.setPersonality(personality);
+                    // Actualizar la esfera según la personalidad
+                    updateSphereForPersonality(personality);
+                } catch (error) {
+                    console.error('Error al cambiar personalidad:', error);
+                }
+            });
+        });
+
+        // Función para actualizar la esfera según la personalidad
+        function updateSphereForPersonality(personality) {
+            const personalityColors = {
+                'TONY_STARK': { primary: '#ff4d4d', secondary: '#ffd700' },
+                'HAL_9000': { primary: '#ff0000', secondary: '#ffffff' },
+                'GLADOS': { primary: '#00ff00', secondary: '#000000' },
+                'PROFESIONAL': { primary: '#4169e1', secondary: '#ffffff' },
+                'AMIGABLE': { primary: '#ff69b4', secondary: '#ffffff' },
+                'SARCASTICO': { primary: '#ffa500', secondary: '#000000' }
+            };
+
+            const colors = personalityColors[personality] || personalityColors['PROFESIONAL'];
+            
+            // Actualizar colores de la esfera
+            if (orb) {
+                orb.material.color.set(colors.primary);
+                orb.material.emissive.set(colors.secondary);
+            }
+        }
+
+        // Actualizar memoria y emoción cada 5 segundos
+        setInterval(() => {
+            updateMemoryData();
+            updateEmotionState();
+        }, 5000);
+
+        // Inicializar estado
+        updateMemoryData();
+        updateEmotionState();
+
+        // Actualizar indicador de emoción
+        function updateEmotionIndicator(emotion) {
+            const emotionIcons = {
+                'feliz': '😊',
+                'triste': '😢',
+                'enojado': '😠',
+                'emocionado': '🤩',
+                'cansado': '😴',
+                'neutral': '😐'
+            };
+            
+            emotionIcon.textContent = emotionIcons[emotion] || emotionIcons.neutral;
+            emotionText.textContent = `Estado emocional: ${emotion.charAt(0).toUpperCase() + emotion.slice(1)}`;
+        }
+
+        // Efecto visual para verificación
+        function showVerificationGlow() {
+            const glow = document.getElementById('verificationGlow');
+            glow.classList.add('active');
+            setTimeout(() => {
+                glow.classList.remove('active');
+            }, 1000);
+        }
+
+        // Escuchar mensajes del backend
+        window.addEventListener('message', function(event) {
+            if (event.data === 'showVerification') {
+                showVerificationGlow();
+            }
+        });
+    </script>
+
+    <!-- 🔐 KAY HUD Signature: Created by Luis F Julio - Hidden Voice Tech 2025 -->
+    <script>
+        const __kSec = "KAY_LFJ_2025".split("").reverse().join(""); // Firma oculta
+        
+        // Función para verificar la autenticidad
+        function verifyKAYAuthenticity() {
+            try {
+                const isValid = Android.verifyAuthenticity();
+                if (isValid) {
+                    console.log("✅ K.A.Y. verificación exitosa");
+                    return true;
+                } else {
+                    console.error("❌ K.A.Y. verificación fallida");
+                    return false;
+                }
+            } catch (error) {
+                console.error("Error en verificación:", error);
+                return false;
+            }
+        }
+
+        // Verificar al cargar
+        document.addEventListener('DOMContentLoaded', () => {
+            verifyKAYAuthenticity();
+        });
+    </script>
+</body>
+</html> 

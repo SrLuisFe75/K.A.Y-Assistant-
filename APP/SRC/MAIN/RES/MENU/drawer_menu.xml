@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:showIn="navigation_view">
+
+    <group android:checkableBehavior="single">
+        <item
+            android:id="@+id/nav_personality"
+            android:icon="@android:drawable/ic_menu_manage"
+            android:title="Personalidad" />
+        <item
+            android:id="@+id/nav_memory"
+            android:icon="@android:drawable/ic_menu_info_details"
+            android:title="Memoria" />
+        <item
+            android:id="@+id/nav_learning"
+            android:icon="@android:drawable/ic_menu_add"
+            android:title="Aprendizaje" />
+        <item
+            android:id="@+id/nav_emotion"
+            android:icon="@android:drawable/ic_menu_gallery"
+            android:title="Estado Emocional" />
+        <item
+            android:id="@+id/nav_language"
+            android:icon="@android:drawable/ic_menu_sort_alphabetically"
+            android:title="Idioma / Language" />
+        <item
+            android:id="@+id/nav_routines"
+            android:icon="@android:drawable/ic_menu_agenda"
+            android:title="Rutinas" />
+        <item
+            android:id="@+id/nav_settings"
+            android:icon="@android:drawable/ic_menu_preferences"
+            android:title="Voice Recognition" />
+        <item
+            android:id="@+id/nav_silence"
+            android:icon="@android:drawable/ic_lock_silent_mode"
+            android:title="Silenciar" />
+    </group>
+</menu>
